@@ -9,12 +9,16 @@ The AMD64 Debian 13 computer where Rust source code is edited and compiled.
 _Avoid_: target machine, board (when referring to the development computer)
 
 **Target**:
-The ARM64 Debian 13 PYNQ-Z2 system where the compiled Rust application runs.
+The Debian 13 armhf PYNQ-Z2 system where the compiled Rust application runs. The board is based on a Zynq-7000 dual-core Cortex-A9, so architecture must be verified before selecting a target triple.
 _Avoid_: host (for the board)
 
 **Cross-compilation**:
 Building a program on the host so that its executable runs on a different target architecture and operating system.
 _Avoid_: remote compilation (unless compilation actually happens on the board)
+
+**Board boot chain**:
+The board-specific FSBL/`BOOT.BIN`, U-Boot, Linux kernel, and device-tree blob needed to start the Zynq platform from the TF card.
+_Avoid_: treating a generic Debian ARM image as a complete PYNQ-Z2 boot image
 
 **Linux user-space application**:
 A normal Linux process that uses operating-system interfaces and device nodes while the Linux kernel continues to manage the hardware.

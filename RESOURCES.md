@@ -1,5 +1,20 @@
 # Rust Embedded User-Space Resources
 
+## PYNQ-Z2 and Debian 13
+
+- [PYNQ-Z2 Setup Guide](https://pynq.readthedocs.io/en/latest/getting_started/pynq_z2_setup.html)
+  Official SD-boot jumper, power, Micro USB-UART, Ethernet, and first-boot steps.
+- [PYNQ supported boards and pre-built images](https://www.pynq.io/boards.html)
+  Official board table identifying PYNQ-Z2 as Zynq Z7020 and separating `arm` from `aarch64` root filesystems.
+- [PYNQ SD Card image build guide](https://github.com/Xilinx/PYNQ/blob/master/docs/source/pynq_sd_card.rst)
+  Explains how the board-specific boot files, U-Boot, device tree, kernel, and root filesystem fit together.
+- [Debian armhf booting guide](https://www.debian.org/releases/stable/armhf/ch05s01.en.html)
+  Describes U-Boot, kernel, initrd, and device-tree requirements for 32-bit hard-float ARM systems.
+- [Rust Arm Linux support](https://doc.rust-lang.org/rustc/platform-support/arm-linux.html)
+  Covers 32-bit Arm ABI selection and cross-linker setup for Linux user-space programs.
+- [Community: PYNQ-Z2 U-Boot and Linux kernel](https://gist.github.com/zOrg1331/f1e90e4b31dc668fbe6837a18492a8ee)
+  A practical record of board-specific boot artifacts; use it as a supplement to the official files and serial logs.
+
 ## Knowledge
 
 - [The Rust Programming Language](https://doc.rust-lang.org/book/)
@@ -8,12 +23,12 @@
   Official runnable examples. Use as a concise companion when looking up syntax introduced in a lesson.
 - [Cross-compilation - The rustup book](https://rust-lang.github.io/rustup/cross-compilation.html)
   Explains target standard libraries and why native linker tools are also needed for cross-compilation.
-- [`aarch64-unknown-linux-gnu` target support](https://doc.rust-lang.org/rustc/platform-support/aarch64-unknown-linux-gnu.html)
-  Rust's target requirements and support status for 64-bit Linux on ARM.
+- [`armv7-unknown-linux-gnueabihf` target support](https://doc.rust-lang.org/rustc/platform-support/arm-linux.html)
+  Rust's target requirements and support status for 32-bit hard-float Linux on ARM.
 - [Cargo configuration reference](https://doc.rust-lang.org/cargo/reference/config.html)
   Use to configure a target-specific linker and other per-target build settings.
-- [Debian `gcc-aarch64-linux-gnu` package](https://packages.debian.org/trixie/gcc-aarch64-linux-gnu)
-  The Debian cross-compiler package for producing ARM64 Linux executables from an AMD64 host.
+- [Debian `gcc-arm-linux-gnueabihf` package](https://packages.debian.org/trixie/gcc-arm-linux-gnueabihf)
+  The Debian cross-compiler package for producing ARMv7 hard-float Linux executables from an AMD64 host.
 - [Linux SPI userspace API](https://docs.kernel.org/spi/spidev.html)
   Kernel documentation for the `spidev` character-device interface, transfer modes, and configuration.
 - [Rust `TcpStream`](https://doc.rust-lang.org/std/net/struct.TcpStream.html)
