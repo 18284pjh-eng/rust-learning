@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第 0 课：从 TF 卡启动 PYNQ-Z2 的 Debian 13</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+  <div class="topline">
+    <div class="topline-inner">
+      <strong>Rust · PYNQ-Z2</strong>
+      <nav aria-label="课程导航">
+        <a href="../index.html">课程总览</a>
+        <a href="../reference/pynq-z2-debian13.html">系统搭建速查</a>
+        <a href="../reference/arm64-cross-compile.html">交叉编译速查</a>
+      </nav>
+    </div>
+  </div>
+  <header class="masthead">
+    <div class="topline-inner" style="display:block">
+      <p class="eyebrow">Lesson 00 · Board bring-up</p>
+      <h1>从 TF 卡启动 PYNQ-Z2 的 Debian 13</h1>
+      <p class="lede">先让板子有一个可观察、可恢复的 Linux 系统，再开始 Rust。你会从一张备用 TF 卡开始，保留板级启动链，建立 Debian 13 armhf 根文件系统，并通过串口完成第一次登录。</p>
+      <div class="meta-row"><span><strong>时长</strong> 约 2–3 小时</span><span><strong>主题</strong> TF 卡、U-Boot、根文件系统、串口</span><span><strong>完成标准</strong> 板上报告 Debian 13 与 armhf</span></div>
+      <div class="outcome"><p><strong>本课成果</strong>：在不依赖 HDMI 的情况下，从 TF 卡启动 PYNQ-Z2，完成串口登录，并验证 Debian 13、ARMv7/armhf、以太网和现有设备节点。</p></div>
+    </div>
+  </header>
+  <main>
+    <section class="section">
+      <h2>先过架构闸门</h2>
+      <p>PYNQ-Z2 的核心是 Zynq Z7020，处理系统使用双核 ARM Cortex-A9。它是 32 位 ARMv7 平台，不是 ARM64/AArch64。PYNQ 官方构建文档也将 Zynq-7000 的架构写作 <code>arm</code>，而把 <code>aarch64</code> 留给 Zynq UltraScale+ 等 64 位平台。</p>
+      <p>所以本课程的默认 Debian 目标是 <code>armhf</code>，Rust 目标通常是 <code>armv7-unknown-linux-gnueabihf</code>。第 1 课原先的 ARM64 表述会随本课修正。若你现有系统的 <code>uname -m</code> 输出是 <code>aarch64</code>，先不要照抄后续命令，把输出带回课程对话核对。</p>
+      <div class="note"><p><strong>安全边界：</strong>本课默认使用备用 TF 卡。涉及 <code>dd</code>、分区和格式化的命令都只使用你确认过的设备名；不要把系统盘路径直接替换进去。</p></div>
+      <details>
+        <summary>完成预测后查看自检要点</summary>
+        <div class="answer"><p>PYNQ-Z2 的 PS 是 Cortex-A9，运行 32 位 Linux 时通常看到 <code>armv7l</code>，Debian 包架构是 <code>armhf</code>。<code>arm64</code> 和 <code>aarch64</code> 不能作为这块 Zynq-7000 的默认目标。</p></div>
+      </details>
+    </section>
+
+    <section class="section">
+      <h2>你需要的材料</h2>
+      <ul class="checks">
+        <li>PYNQ-Z2 和一张备用 TF 卡；官方入门文档建议至少 8 GB。</li>
+        <li>主机上的 Debian 13 AMD64、读写 TF 卡的 USB 读卡器、网线。</li>
+        <li>连接板上 <strong>PROG-UART</strong> Micro USB 口的 USB 线，以及主机上的串口终端程序。</li>
+        <li>一份官方 PYNQ-Z2 SD 卡镜像，用来验证板级启动链；不要把它当成最终 Debian 13 根文件系统。</li>
+      </ul>
+      <p>先读<a href="https://pynq.readthedocs.io/en/latest/getting_started/pynq_z2_setup.html">官方 PYNQ-Z2 Setup Guide</a>，再看<a href="https://www.pynq.io/boards.html">PYNQ 官方板卡和镜像页</a>。官方资料确认了 SD 启动跳线、Micro USB-UART、以太网和镜像写入的基本路径。</p>
+    </section>
+
+    <section class="section">
+      <h2>路线：先保留启动链，再换根文件系统</h2>
+      <ol class="flow" aria-label="PYNQ-Z2 Debian 13 搭建流程">
+        <li><strong>官方镜像</strong><span>验证 TF 卡、FSBL、U-Boot、内核、设备树</span></li>
+        <li><strong>架构记录</strong><span>确认 armv7l、armhf 和串口设备</span></li>
+        <li><strong>Debian 根文件系统</strong><span>主机生成 Debian 13 armhf</span></li>
+        <li><strong>板上验收</strong><span>复用板级启动文件，串口登录并联网</span></li>
+      </ol>
+      <p>这条路线把“板子如何启动”与“Linux 用户空间有哪些文件”分开。Debian 文档说明 ARM 启动还需要与平台对应的内核、初始文件系统和设备树；PYNQ 的 SD 构建流程则负责生成 Zynq 的 <code>BOOT.bin</code>、U-Boot、设备树和内核。不要用普通 PC 的 Debian armhf SD 镜像直接覆盖 PYNQ-Z2。</p>
+      <p>可选的社区参考是<a href="https://gist.github.com/zOrg1331/f1e90e4b31dc668fbe6837a18492a8ee">PYNQ-Z2 U-Boot 与 Linux 内核记录</a>；它适合理解文件关系，不替代你手上的板卡镜像和串口日志。</p>
+    </section>
+
+    <section class="section">
+      <h2>任务 A：先让官方镜像启动</h2>
+      <ol class="steps">
+        <li>
+          <strong>确认 TF 卡设备名。</strong>插入备用卡，只观察设备，不要格式化。
+          <pre><code>lsblk -o NAME,SIZE,MODEL,TRAN,MOUNTPOINTS
+sudo dmesg --follow</code></pre>
+          <p>记下整张卡对应的设备，例如 <code>/dev/sdX</code> 或 <code>/dev/mmcblkX</code>。后续命令使用整盘设备，不使用其中某个分区。</p>
+        </li>
+        <li>
+          <strong>写入官方 PYNQ-Z2 镜像。</strong>先解压下载的镜像，核对文件名和校验值，再把它写到备用卡。下面是 Linux 主机示例；把 <code>/dev/sdX</code> 换成你刚刚确认的设备。
+          <pre><code>unzip pynq-z2-image.zip
+sha256sum pynq-z2-image.img
+sudo umount /dev/sdX?* 2&gt;/dev/null || true
+sudo dd if=pynq-z2-image.img of=/dev/sdX bs=4M status=progress conv=fsync
+sync</code></pre>
+          <p>写入 TF 卡会覆盖整张卡。PYNQ 官方也明确要求把解压后的镜像写入 MicroSD，而不是把压缩包或镜像文件复制成普通文件。</p>
+        </li>
+        <li>
+          <strong>设置板卡。</strong>Boot 跳线拨到 SD，电源跳线按官方设置，插入 TF 卡；连接 PROG-UART Micro USB 和网线后再上电。串口终端先使用 <code>115200 8N1</code>，若输出乱码，以当前镜像的启动文档为准。
+        </li>
+        <li>
+          <strong>记录第一次启动。</strong>通过串口观察 U-Boot 和 Linux 日志，登录后记录：
+          <pre><code>cat /etc/os-release
+uname -a
+uname -m
+dpkg --print-architecture
+cat /proc/device-tree/model
+cat /proc/consoles
+ip addr</code></pre>
+          <p>本课的关键记录应类似：<code>uname -m=armv7l</code>、<code>dpkg --print-architecture=armhf</code>、设备模型包含 PYNQ-Z2 或 Zynq。</p>
+        </li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <h2>任务 B：在主机生成 Debian 13 armhf 根文件系统</h2>
+      <ol class="steps">
+        <li>
+          <strong>安装主机工具。</strong>
+          <pre><code>sudo apt update
+sudo apt install debootstrap qemu-user-static binfmt-support rsync \
+  parted dosfstools e2fsprogs</code></pre>
+        </li>
+        <li>
+          <strong>生成 Debian 13 根文件系统。</strong>在工作目录操作，不要把输出目录指向已挂载的系统目录。
+          <pre><code>mkdir -p ~/pynq-z2-debian/rootfs
+sudo debootstrap --arch=armhf --foreign trixie \
+  ~/pynq-z2-debian/rootfs http://deb.debian.org/debian
+sudo cp /usr/bin/qemu-arm-static ~/pynq-z2-debian/rootfs/usr/bin/
+sudo chroot ~/pynq-z2-debian/rootfs /debootstrap/debootstrap --second-stage</code></pre>
+          <p><code>debootstrap</code> 的第一阶段在 AMD64 主机下载和解包，第二阶段借助 ARM 模拟器完成目标架构配置。你可以把镜像源换成所在网络更快的 Debian 镜像。</p>
+        </li>
+        <li>
+          <strong>写入基础配置。</strong>把串口设备名替换成任务 A 从 <code>/proc/consoles</code> 或启动日志确认的值；不要预设成某个 tty。
+          <pre><code>ROOTFS="$HOME/pynq-z2-debian/rootfs"
+echo pynq-z2 | sudo tee "$ROOTFS/etc/hostname"
+sudo tee "$ROOTFS/etc/apt/sources.list.d/debian.sources" &gt;/dev/null &lt;&lt;'EOF'
+Types: deb
+URIs: http://deb.debian.org/debian
+Suites: trixie trixie-updates
+Components: main
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+Types: deb
+URIs: http://security.debian.org/debian-security
+Suites: trixie-security
+Components: main
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+EOF
+sudo chroot "$ROOTFS" apt update
+sudo chroot "$ROOTFS" apt install systemd-sysv openssh-server sudo ca-certificates
+sudo chroot "$ROOTFS" passwd</code></pre>
+          <p>密码只在板上终端输入，不要贴到课程对话或仓库。首次部署可先只启用串口登录，网络和 SSH 放到串口验收通过后配置。</p>
+        </li>
+        <li>
+          <strong>保存板级启动文件。</strong>把任务 A 中官方镜像的第一分区完整备份到主机，并记录原根分区的文件系统标签、分区号和启动参数。至少保留 <code>BOOT.BIN</code>、<code>image.ub</code> 或拆出的内核/DTB；不同 PYNQ 版本文件名可能不同。
+          <pre><code>sudo mkdir -p /mnt/pynq-boot
+sudo mount -o ro /dev/sdX1 /mnt/pynq-boot
+find /mnt/pynq-boot -maxdepth 2 -type f -printf '%P\n' | sort
+sudo rsync -aHAX /mnt/pynq-boot/ ~/pynq-z2-debian/boot-backup/</code></pre>
+          <p>如果启动文件是一个 FIT 镜像（常见名称为 <code>image.ub</code>），不要直接编辑二进制。先保留原件，后续需要调整 <code>root=</code> 时再依据 U-Boot 环境或 FIT 源文件处理。</p>
+        </li>
+        <li>
+          <strong>部署到新的根分区。</strong>推荐使用另一张卡或卡上的新 ext4 分区。格式化前再次运行 <code>lsblk</code> 核对分区；把 Debian 根文件系统同步进去，并从已知可启动的 PYNQ 根文件系统补齐匹配内核版本的模块和固件。
+          <pre><code>sudo mkfs.ext4 -L pynq-root /dev/sdX2
+sudo mkdir -p /mnt/pynq-root
+sudo mount /dev/sdX2 /mnt/pynq-root
+sudo rsync -aHAX --numeric-ids "$ROOTFS"/ /mnt/pynq-root/
+# 仅在确认内核版本匹配后再复制：
+# sudo rsync -aHAX /mnt/known-good/lib/modules/ /mnt/pynq-root/lib/modules/
+# sudo rsync -aHAX /mnt/known-good/lib/firmware/ /mnt/pynq-root/lib/firmware/
+sync</code></pre>
+          <p>首次练习的目标是理解分区和启动链，而不是盲目覆盖当前可用卡。若 U-Boot 仍指向旧的分区标签或 PARTUUID，系统会停在找不到根文件系统；保留串口日志，下一步再改启动参数。</p>
+        </li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <h2>任务 C：Debian 13 首次启动验收</h2>
+      <ol class="steps">
+        <li><strong>先看串口。</strong>上电后确认 U-Boot 找到内核和设备树；内核启动后确认根分区挂载成功。遇到停机时，保存从上电开始的完整串口文本。</li>
+        <li><strong>验证系统身份。</strong>
+          <pre><code>cat /etc/debian_version
+uname -m
+dpkg --print-architecture
+systemctl --failed
+ip link
+ls -l /dev/ttyPS* /dev/spidev* 2&gt;/dev/null</code></pre>
+        </li>
+        <li><strong>验证网络。</strong>先用 DHCP 获取地址，再从主机测试 SSH；若设备树已经暴露 SPI/UART 节点，记录节点路径和权限，不要在本课修改设备树。</li>
+        <li><strong>写下架构结论。</strong>将最终的 <code>uname -m</code>、<code>dpkg --print-architecture</code>、板卡模型、内核版本和根分区来源保存到学习记录。这些信息决定后续 Rust 的 target triple 和 C 交叉编译器。</li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <h2>验收清单</h2>
+      <ul class="checks">
+        <li>备用 TF 卡能够让 PYNQ-Z2 从 SD 位置启动，串口能看到启动日志。</li>
+        <li>能解释 <code>BOOT.BIN</code>、U-Boot、Linux 内核、DTB 和根文件系统分别负责什么。</li>
+        <li>板上 Debian 版本为 13，架构为 <code>armhf</code>，内核架构输出为 <code>armv7l</code> 或与实际系统一致。</li>
+        <li>能从主机复制一个文件到板上，并通过串口或 SSH 执行验证。</li>
+        <li>保留了官方启动分区备份和完整串口日志，下一课不再依赖猜测。</li>
+      </ul>
+      <details>
+        <summary>常见失败现象与定位方向</summary>
+        <div class="answer"><ul>
+          <li>完全没有串口输出：检查 Boot 跳线、电源、PROG-UART 口、串口设备和波特率。</li>
+          <li>Done 灯不亮：先恢复官方 PYNQ 镜像，确认 TF 卡写入目标和镜像完整性。</li>
+          <li>U-Boot 能启动但找不到根文件系统：检查 <code>root=</code>、分区标签/PARTUUID、ext4 文件系统和串口完整日志。</li>
+          <li><code>Exec format error</code>：把它当作架构不匹配，检查 <code>uname -m</code> 与根文件系统架构；不要先重装 Rust。</li>
+          <li>系统能启动但没有 SPI/UART 节点：记录设备树、内核和 overlay 来源，留到设备访问课程处理。</li>
+        </ul></div>
+      </details>
+    </section>
+
+    <section class="section">
+      <h2>带回来的结果</h2>
+      <p>把以下内容发回课程对话：<code>cat /etc/os-release</code>、<code>uname -a</code>、<code>uname -m</code>、<code>dpkg --print-architecture</code>、<code>cat /proc/device-tree/model</code>，以及失败时从上电开始的串口日志。不要发送密码、令牌、私钥或完整网络配置。</p>
+      <p class="next-step">下一课：根据本课确认的架构，在 AMD64 主机上为 PYNQ-Z2 构建第一个 Rust 目标探针。</p>
+      <p class="small">参考速查：<a href="../reference/pynq-z2-debian13.html">PYNQ-Z2 Debian 13 系统搭建</a> · <a href="../lessons/0001-host-to-arm64.html">第 1 课</a> · <a href="../index.html">课程总览</a></p>
+    </section>
+  </main>
+  <footer>系统搭建是可恢复的实验：先保留能启动的启动链，再替换用户空间。遇到问题时，带上完整串口日志继续提问。</footer>
+</body>
+</html>
