@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rust 嵌入式 Linux 用户态课程</title>
+  <link rel="stylesheet" href="assets/lesson.css">
+</head>
+<body>
+  <div class="topline">
+    <div class="topline-inner">
+      <strong>Rust · PYNQ-Z2</strong>
+      <nav aria-label="课程资料">
+        <a href="MISSION.md">学习目标</a>
+        <a href="RESOURCES.md">资源</a>
+        <a href="reference/arm64-cross-compile.html">交叉编译速查</a>
+      </nav>
+    </div>
+  </div>
+  <header class="masthead">
+    <div class="topline-inner" style="display:block">
+      <p class="eyebrow">自定进度 · 每课约 2–3 小时</p>
+      <h1>从嵌入式 C 到 Rust 用户态程序</h1>
+      <p class="lede">在 Debian 13 AMD64 主机上开发和交叉编译，在 PYNQ-Z2 ARM64 上运行；从小型 SPI、UART 模块走到 TCP 数据传输。</p>
+    </div>
+  </header>
+  <main>
+    <section class="section">
+      <h2>课程路径</h2>
+      <p class="muted">先建立 Rust 语言基础，再把同一套所有权和错误处理方法用于 Linux 外设与网络 I/O。每课都有一项可检查的成果。</p>
+      <ol class="course-list">
+        <li>
+          <span class="num">01</span>
+          <div><a href="lessons/0001-host-to-arm64.html">从 AMD64 构建并运行 ARM64 程序</a><p>辨认 host 与 target，构建一个报告自身目标架构的小程序。</p></div>
+          <span class="status current">现在开始</span>
+        </li>
+        <li><span class="num">02</span><div><span class="title">Rust 表达式、类型与控制流</span><p>把输入、转换和条件分支写成可编译的小程序。</p></div><span class="status">后续课程</span></li>
+        <li><span class="num">03</span><div><span class="title">结构体、枚举与数据帧</span><p>用类型描述通信配置、命令和解析结果。</p></div><span class="status">后续课程</span></li>
+        <li><span class="num">04</span><div><span class="title">所有权、借用与缓冲区</span><p>在字节缓冲区中练习 move、借用和切片。</p></div><span class="status">后续课程</span></li>
+        <li><span class="num">05</span><div><span class="title">Option、Result 与错误传播</span><p>区分可恢复 I/O 错误、无效数据和程序缺陷。</p></div><span class="status">后续课程</span></li>
+        <li><span class="num">06</span><div><span class="title">模块、trait 与测试替身</span><p>分离协议逻辑和设备访问，让核心逻辑能在主机测试。</p></div><span class="status">后续课程</span></li>
+        <li><span class="num">07</span><div><span class="title">UART 用户态模块</span><p>配置 Linux 串口、读写字节，并验证回显。</p></div><span class="status">后续课程</span></li>
+        <li><span class="num">08</span><div><span class="title">SPI 用户态模块</span><p>配置模式和传输参数，检查 SPI 收发缓冲区。</p></div><span class="status">后续课程</span></li>
+        <li><span class="num">09</span><div><span class="title">TCP 客户端与 PC 服务端</span><p>由 PYNQ 建立连接并发送一段数据。</p></div><span class="status">后续课程</span></li>
+        <li><span class="num">10</span><div><span class="title">TCP 分帧、超时与断线处理</span><p>处理部分读写、协议边界和连接失败。</p></div><span class="status">后续课程</span></li>
+        <li><span class="num">11</span><div><span class="title">串联外设数据与 TCP</span><p>把 UART 或 SPI 数据打包后送到 PC。</p></div><span class="status">后续课程</span></li>
+        <li><span class="num">12</span><div><span class="title">部署验收与迁移检查清单</span><p>在板上验收 ARM64 程序，并准备接入真实 C 模块。</p></div><span class="status">后续课程</span></li>
+      </ol>
+    </section>
+    <section class="section">
+      <h2>设备与构建边界</h2>
+      <p>Rust 程序运行在 PYNQ-Z2 的 Linux 用户态，复用现有设备树、驱动和设备节点。主课程不编写内核驱动、裸机固件或 FPGA RTL。TCP 使用 Linux 提供的 socket。</p>
+      <p>外设访问会先使用 Rust 用户态库；课程会说明库与 Linux 设备接口的对应关系。真实 C 源码会等到实际迁移阶段再收集。</p>
+    </section>
+  </main>
+  <footer>课程资料以一课一页的方式累积。完成任务后，把运行结果或遇到的错误带回课程对话。</footer>
+</body>
+</html>
