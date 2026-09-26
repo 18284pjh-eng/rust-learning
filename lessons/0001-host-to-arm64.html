@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第 1 课：从 AMD64 构建并运行 ARM64 程序</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+  <div class="topline">
+    <div class="topline-inner">
+      <strong>Rust · PYNQ-Z2</strong>
+      <nav aria-label="课程导航">
+        <a href="../index.html">课程总览</a>
+        <a href="../reference/arm64-cross-compile.html">交叉编译速查</a>
+      </nav>
+    </div>
+  </div>
+  <header class="masthead">
+    <div class="topline-inner" style="display:block">
+      <p class="eyebrow">Lesson 01 · Build and deploy</p>
+      <h1>从 AMD64 构建并运行 ARM64 程序</h1>
+      <p class="lede">先把“在哪里编译”和“程序要在哪里运行”分开。今天的成果是一支能在主机与 PYNQ-Z2 分别报告自身目标架构的 Rust 程序。</p>
+      <div class="meta-row"><span><strong>时长</strong> 约 2–3 小时</span><span><strong>主题</strong> Cargo、目标平台、交叉编译</span><span><strong>完成标准</strong> 程序在板上报告 aarch64/linux</span></div>
+      <div class="outcome"><p><strong>本课成果</strong>：在 Debian 13 AMD64 主机创建 Rust 项目、构建 ARM64 Linux 可执行文件，并部署到 PYNQ-Z2 上运行。</p></div>
+    </div>
+  </header>
+  <main>
+    <section class="section">
+      <h2>开始前，先回忆</h2>
+      <p>不查资料，先用自己的话回答：主机（host）和目标（target）分别是哪台机器？在主机上运行的程序，能直接在 ARM64 板子上运行吗？</p>
+      <details>
+        <summary>完成预测后查看自检要点</summary>
+        <div class="answer"><p>主机是 AMD64 Debian 13 开发机；目标是 ARM64 Debian 13 的 PYNQ-Z2。默认构建面向主机，目标架构不同的二进制不能直接在板上运行，必须针对 ARM64 构建。</p></div>
+      </details>
+    </section>
+
+    <section class="section">
+      <h2>一个程序，两个平台</h2>
+      <p>源代码相同，构建时指定不同目标，Rust 编译器就会生成对应平台的程序。AMD64 主机负责编辑和编译；PYNQ-Z2 负责运行 ARM64 程序。</p>
+      <ol class="flow" aria-label="交叉编译流程">
+        <li><strong>AMD64 主机</strong><span>编辑 Rust 源码</span></li>
+        <li><strong>Rust 目标标准库</strong><span>选择 aarch64 Linux</span></li>
+        <li><strong>ARM64 GNU 链接器</strong><span>生成 Linux 可执行文件</span></li>
+        <li><strong>PYNQ-Z2</strong><span>部署并运行验收</span></li>
+      </ol>
+      <p>Rust 官方把 ARM64 GNU/Linux 目标命名为 <code>aarch64-unknown-linux-gnu</code>。它是 Rust 官方支持的目标；交叉编译时除了目标标准库，通常还需要目标链接器。参阅<a href="https://doc.rust-lang.org/rustc/platform-support/aarch64-unknown-linux-gnu.html">目标说明</a>和<a href="https://rust-lang.github.io/rustup/cross-compilation.html">rustup 交叉编译指南</a>。</p>
+    </section>
+
+    <section class="section">
+      <h2>任务：做一个目标探针</h2>
+      <p>新建独立 Cargo 项目 <code>target-probe</code>。它只做一件事：打印编译时的操作系统和 CPU 架构。</p>
+      <ol class="steps">
+        <li>
+          <strong>记录主机环境。</strong>运行下面命令，记下主机架构和 Rust 工具链版本。
+          <pre><code>uname -m
+rustc --version
+cargo --version</code></pre>
+        </li>
+        <li>
+          <strong>创建项目。</strong>用 Cargo 初始化项目，然后在 <code>src/main.rs</code> 中实现目标信息输出。
+          <pre><code>cargo new target-probe
+cd target-probe</code></pre>
+          <p>提示：Rust 标准库的 <code>std::env::consts::OS</code> 和 <code>std::env::consts::ARCH</code> 是编译目标的常量。按自己的代码风格组合并打印它们。</p>
+        </li>
+        <li>
+          <strong>先在主机运行。</strong>
+          <pre><code>cargo run</code></pre>
+          <p>自检输出应包含 <code>linux/x86_64</code>。标准库常量见 <a href="https://doc.rust-lang.org/std/env/consts/">Rust 标准库文档</a>。</p>
+        </li>
+        <li>
+          <strong>安装 ARM64 交叉编译器和 Rust 目标标准库。</strong>Rustup 当前只装了主机标准库；Debian 提供 ARM64 GNU 交叉编译器包。安装前确认你有管理员权限。
+          <pre><code>sudo apt install gcc-aarch64-linux-gnu
+rustup target add aarch64-unknown-linux-gnu</code></pre>
+          <p>Debian 包会提供 <code>aarch64-linux-gnu-gcc</code>。本机已安装的 Rust 工具链和这个交叉编译器是两件不同的工具。参阅<a href="https://packages.debian.org/trixie/gcc-aarch64-linux-gnu">Debian 包说明</a>。</p>
+        </li>
+        <li>
+          <strong>告诉 Cargo 使用目标链接器。</strong>在项目中新建 <code>.cargo/config.toml</code>，写入：
+          <pre><code>[target.aarch64-unknown-linux-gnu]
+linker = "aarch64-linux-gnu-gcc"</code></pre>
+          <p>Cargo 支持按 target 配置 linker。参阅<a href="https://doc.rust-lang.org/cargo/reference/config.html">Cargo 配置参考</a>。</p>
+        </li>
+        <li>
+          <strong>构建并检查 ARM64 产物。</strong>
+          <pre><code>cargo build --release --target aarch64-unknown-linux-gnu
+file target/aarch64-unknown-linux-gnu/release/target-probe
+readelf -h target/aarch64-unknown-linux-gnu/release/target-probe</code></pre>
+          <p>检查格式是 ELF 64 位、AArch64。Cargo 会把目标产物放到独立的 target 目录。</p>
+        </li>
+        <li>
+          <strong>部署到 PYNQ-Z2 运行。</strong>将占位符替换成你自己的 Linux 用户名和板卡地址。不要把密码发到课程对话中。
+          <p>在主机上复制文件：</p>
+          <pre><code>scp target/aarch64-unknown-linux-gnu/release/target-probe USER@BOARD_IP:/tmp/target-probe</code></pre>
+          <p>仍在主机上，通过 SSH 让板子运行：</p>
+          <pre><code>ssh USER@BOARD_IP 'chmod +x /tmp/target-probe'
+ssh USER@BOARD_IP '/tmp/target-probe'</code></pre>
+          <p>板上输出应包含 <code>linux/aarch64</code>。如果 SSH 尚未配置，先完成文件传输方式确认，再继续部署。</p>
+        </li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <h2>验收清单</h2>
+      <ul class="checks">
+        <li>主机原生运行时，程序报告 <code>linux/x86_64</code>。</li>
+        <li><code>file</code> 或 <code>readelf</code> 确认交叉构建结果是 ARM64 ELF。</li>
+        <li>同一个程序部署到 PYNQ-Z2 后，报告 <code>linux/aarch64</code>。</li>
+        <li>能解释 Cargo 默认构建目标与 <code>--target</code> 的区别。</li>
+      </ul>
+      <details>
+        <summary>常见失败现象与定位方向</summary>
+        <div class="answer">
+          <ul>
+            <li><code>linker ... not found</code>：检查 Debian 交叉编译器是否安装，以及 Cargo linker 名称是否拼对。</li>
+            <li><code>Exec format error</code>：目标二进制架构不匹配，重新确认构建命令含有 ARM64 target。</li>
+            <li><code>Permission denied</code>：检查远端文件执行权限和部署用户权限。</li>
+            <li>找不到文件但路径确实存在：可能是动态加载器/运行库不匹配；记录错误全文和板上 Debian 信息再排查。</li>
+          </ul>
+        </div>
+      </details>
+    </section>
+
+    <section class="section">
+      <h2>带回来的结果</h2>
+      <p>完成后，把主机和板上的架构输出、ARM64 ELF 检查结果，以及你对 host/target 的一句话解释发给我。我会据此检查构建链路，并决定下一课从哪些 Rust 基础开始。遇到错误时贴错误全文即可；不要贴密码、令牌或私钥。</p>
+      <p class="next-step">下一课：用 Rust 的表达式、类型和控制流处理一小段通信配置。</p>
+      <p class="small">参考速查：<a href="../reference/arm64-cross-compile.html">AMD64 到 ARM64 Linux 交叉编译</a> · <a href="../index.html">课程总览</a></p>
+    </section>
+  </main>
+  <footer>课程以可运行的小任务推进。需要帮助时，带上当前代码、运行命令和完整错误信息继续提问。</footer>
+</body>
+</html>
