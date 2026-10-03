@@ -1,11 +1,11 @@
 # Rust Embedded User-Space Resources
 
-## PYNQ-Z2 and Debian 13
+## PYNQ-Z2 official image and later Debian migration
 
 - [PYNQ-Z2 Setup Guide](https://pynq.readthedocs.io/en/latest/getting_started/pynq_z2_setup.html)
   Official SD-boot jumper, power, Micro USB-UART, Ethernet, and first-boot steps.
 - [PYNQ supported boards and pre-built images](https://www.pynq.io/boards.html)
-  Official board table identifying PYNQ-Z2 as Zynq Z7020 and separating `arm` from `aarch64` root filesystems.
+  Official board table identifying PYNQ-Z2 and linking its pre-built SD card image.
 - [PYNQ SD Card image build guide](https://github.com/Xilinx/PYNQ/blob/master/docs/source/pynq_sd_card.rst)
   Explains how the board-specific boot files, U-Boot, device tree, kernel, and root filesystem fit together.
 - [Debian armhf booting guide](https://www.debian.org/releases/stable/armhf/ch05s01.en.html)

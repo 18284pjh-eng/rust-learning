@@ -5,7 +5,7 @@
 ## 学习环境
 
 - 开发机：Debian 13 AMD64
-- 目标板：运行 Debian 13 armhf 的 PYNQ-Z2；第 0 课会先验证架构
+- 目标板：运行官方 PYNQ 镜像的 PYNQ-Z2；第 0 课会先验证架构和 Linux 接口
 - 外设：复用系统已有设备树和 Linux 驱动，通过用户态接口访问 SPI、UART
 - 网络：先使用 Linux TCP socket
 - 节奏：自定进度，每课约 2–3 小时
@@ -13,9 +13,9 @@
 ## 从这里开始
 
 1. 打开 [`index.html`](index.html) 查看课程路径。
-2. 先学习 [第 0 课：从 TF 卡启动 PYNQ-Z2 的 Debian 13](lessons/0000-pynq-z2-debian13.html)。
+2. 先学习 [第 0 课：从 TF 卡启动官方 PYNQ-Z2 镜像](lessons/0000-pynq-z2-debian13.html)。
 3. 再学习 [第 1 课：从 AMD64 构建并运行 ARM Linux 程序](lessons/0001-host-to-arm64.html)。
-4. 查阅[系统搭建速查](reference/pynq-z2-debian13.html)、[交叉编译速查](reference/arm64-cross-compile.html)和[学习资源](RESOURCES.md)。
+4. 查阅[官方镜像系统搭建速查](reference/pynq-z2-debian13.html)、[交叉编译速查](reference/arm64-cross-compile.html)和[学习资源](RESOURCES.md)。
 
 课程目标与范围见 [MISSION.md](MISSION.md)，术语约定见 [CONTEXT.md](CONTEXT.md)。
 
