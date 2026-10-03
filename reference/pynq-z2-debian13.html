@@ -3,67 +3,91 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>速查：PYNQ-Z2 Debian 13 系统搭建</title>
+  <title>速查：PYNQ-Z2 官方镜像系统搭建</title>
   <link rel="stylesheet" href="../assets/lesson.css">
 </head>
 <body>
   <div class="topline"><div class="topline-inner"><strong>Rust 参考页</strong><nav><a href="../index.html">课程总览</a><a href="../lessons/0000-pynq-z2-debian13.html">第 0 课</a></nav></div></div>
-  <header class="masthead"><div class="topline-inner" style="display:block"><p class="eyebrow">Reference · Board bring-up</p><h1>PYNQ-Z2 Debian 13</h1><p class="lede">保留 Zynq-7000 板级启动链，用 Debian 13 armhf 根文件系统替换用户空间。</p></div></header>
+  <header class="masthead"><div class="topline-inner" style="display:block"><p class="eyebrow">Reference · Board bring-up</p><h1>PYNQ-Z2 官方镜像</h1><p class="lede">使用官方 PYNQ-Z2 镜像启动和开发，先验证 Linux 设备接口，再评估 Debian 13 迁移。</p></div></header>
   <main>
     <section class="section">
       <h2>架构结论</h2>
       <ul class="checks">
         <li>PYNQ-Z2：Zynq Z7020，双核 Cortex-A9，32 位 ARMv7。</li>
-        <li>Debian 13 用户空间：<code>armhf</code>。</li>
-        <li>Rust 常用目标：<code>armv7-unknown-linux-gnueabihf</code>。</li>
-        <li>板级启动文件：FSBL/BOOT.BIN、U-Boot、Linux kernel、DTB；具体文件名由镜像版本决定。</li>
+        <li>官方镜像的发行版和用户空间架构：以 <code>/etc/os-release</code>、<code>uname -m</code> 和 <code>dpkg --print-architecture</code> 为准。</li>
+        <li>若板上报告 ARMv7 hard-float，Rust 常用目标：<code>armv7-unknown-linux-gnueabihf</code>。</li>
+        <li>板级启动文件：FSBL/BOOT.BIN、U-Boot、Linux kernel、DTB；官方镜像已经将它们组合好。</li>
       </ul>
     </section>
     <section class="section">
-      <h2>主机准备</h2>
-      <pre><code>sudo apt update
-sudo apt install debootstrap qemu-user-static binfmt-support rsync \
-  parted dosfstools e2fsprogs
-mkdir -p ~/pynq-z2-debian/rootfs
-sudo debootstrap --arch=armhf --foreign trixie \
-  ~/pynq-z2-debian/rootfs http://deb.debian.org/debian
-sudo cp /usr/bin/qemu-arm-static ~/pynq-z2-debian/rootfs/usr/bin/
-sudo chroot ~/pynq-z2-debian/rootfs /debootstrap/debootstrap --second-stage</code></pre>
+      <h2>下载与写卡</h2>
+      <p>当前课程使用官方 PYNQ-Z2 v3.1.1 镜像：<a href="https://download.amd.com/opendownload/pynq/pynq_z2_v3.1.1.zip">pynq_z2_v3.1.1.zip</a>。</p>
+      <pre><code>unzip pynq_z2_v3.1.1.zip
+ls -lh
+sha256sum &lt;解压后的镜像文件&gt;
+sudo umount /dev/sdX?* 2&gt;/dev/null || true
+sudo dd if=&lt;解压后的镜像文件&gt; of=/dev/sdX bs=4M status=progress conv=fsync
+sync</code></pre>
+      <p>写卡前用 <code>lsblk</code> 确认整卡设备。写卡会覆盖整张 TF 卡，当前系统卡和主机系统盘都不能作为目标。</p>
     </section>
     <section class="section">
-      <h2>TF 卡原则</h2>
+      <h2>启动与身份记录</h2>
       <ol class="steps">
-        <li>用 <code>lsblk</code> 确认整卡设备，再写入官方 PYNQ-Z2 镜像。</li>
-        <li>先启动官方镜像并保存串口日志、启动分区、<code>BOOT.BIN</code>、内核和 DTB。</li>
-        <li>只替换已确认的 ext4 根分区；不要覆盖板级启动分区。</li>
-        <li>让 U-Boot 的 <code>root=</code> 指向新根分区的标签或 PARTUUID。</li>
-        <li>首次启动只通过串口验收；网络、SSH、SPI/UART 设备节点随后逐项验证。</li>
+        <li>Boot 跳线拨到 SD，连接 PROG-UART Micro USB 和网线后上电。</li>
+        <li>串口终端使用 <code>115200 8N1</code>、无流控。</li>
+        <li>登录后保存以下输出：</li>
       </ol>
-    </section>
-    <section class="section">
-      <h2>验收命令</h2>
       <pre><code>cat /etc/os-release
 uname -a
 uname -m
 dpkg --print-architecture
 cat /proc/device-tree/model
+cat /proc/cmdline</code></pre>
+    </section>
+    <section class="section">
+      <h2>串口和网络</h2>
+      <pre><code>tty
+stty -F "$(tty)" -a
 cat /proc/consoles
-systemctl --failed
-ls -l /dev/ttyPS* /dev/spidev* 2&gt;/dev/null</code></pre>
-      <p>预期重点：Debian 13、<code>armv7l</code>、<code>armhf</code>。若出现 <code>aarch64</code>，先暂停并核对板卡与系统来源。</p>
+systemctl list-units 'serial-getty@*'
+ip addr
+ip route
+ping -c 3 &lt;主机或网关地址&gt;</code></pre>
+      <p><code>stty</code> 输出中的 <code>speed</code> 是当前登录线路波特率。保存实际串口节点，登录口与业务 UART 可能不是同一设备。</p>
+    </section>
+    <section class="section">
+      <h2>PS 层 SPI/UART 检查</h2>
+      <pre><code>ls -l /dev/ttyPS* /dev/ttyAMA* /dev/serial* 2&gt;/dev/null
+ls -l /dev/spidev* 2&gt;/dev/null
+find /sys/class/spidev -maxdepth 1 -type l -printf '%f\n' 2&gt;/dev/null
+id
+getent group dialout
+getent group spi</code></pre>
+      <p>看到 <code>/dev/spidevB.C</code> 才表示 spidev 用户态接口已经暴露。没有节点时记录设备树、内核和 overlay 状态，本课程先不修改它们。</p>
+    </section>
+    <section class="section">
+      <h2>PYNQ 软件检查</h2>
+      <pre><code>command -v python3
+python3 -c 'import pynq; print(pynq.__version__)'
+printf 'BOARD=%s\n' "$BOARD"
+ls -la /home/xilinx 2&gt;/dev/null || true</code></pre>
+      <p>导入失败时保存完整错误；Rust 的 Linux 用户态练习不依赖 PYNQ Python。需要 Overlay 或 Jupyter 时再处理对应软件环境。</p>
+    </section>
+    <section class="section">
+      <h2>Debian 13 迁移边界</h2>
+      <p>Debian 13 暂时是后续可选实验。当前主线保留官方镜像的启动链、内核和设备树，直接练习 Rust、SPI、UART 和 TCP。等这些模块在官方系统上稳定后，再评估 Debian 根文件系统、内核模块、固件、设备树和启动参数的兼容性。</p>
     </section>
     <section class="section">
       <h2>参考来源</h2>
       <ul class="resource-list">
         <li><a href="https://pynq.readthedocs.io/en/latest/getting_started/pynq_z2_setup.html">PYNQ-Z2 Setup Guide</a><span>：官方 SD 启动跳线、供电、Micro USB-UART 和以太网连接。</span></li>
-        <li><a href="https://www.pynq.io/boards.html">PYNQ supported boards and pre-built images</a><span>：官方板卡型号、Zynq Z7020 与 arm 根文件系统信息。</span></li>
+        <li><a href="https://www.pynq.io/boards.html">PYNQ supported boards and pre-built images</a><span>：官方板卡型号和 PYNQ-Z2 镜像下载。</span></li>
         <li><a href="https://github.com/Xilinx/PYNQ/blob/master/docs/source/pynq_sd_card.rst">PYNQ SD Card image build guide</a><span>：官方说明启动文件、内核、设备树和根文件系统的构建关系。</span></li>
-        <li><a href="https://www.debian.org/releases/stable/armhf/ch05s01.en.html">Debian armhf booting guide</a><span>：U-Boot、kernel、initrd 和 DTB 的平台关系。</span></li>
+        <li><a href="https://docs.kernel.org/spi/spidev.html">Linux SPI userspace API</a><span>：spidev 字符设备和 SPI 用户态访问接口。</span></li>
         <li><a href="https://doc.rust-lang.org/rustc/platform-support/arm-linux.html">Rust Arm Linux support</a><span>：32 位 Arm ABI、交叉编译器和 Cargo linker 配置。</span></li>
-        <li><a href="https://gist.github.com/zOrg1331/f1e90e4b31dc668fbe6837a18492a8ee">社区：PYNQ-Z2 U-Boot and Linux kernel</a><span>：板级启动文件关系的实践记录。</span></li>
       </ul>
     </section>
   </main>
-  <footer>这页是第 0 课的命令和判断速查；实际写卡前始终回到课程页核对设备名。</footer>
+  <footer>当前主线先在官方 PYNQ 系统上学习 Rust 用户态开发；Debian 13 迁移作为后续独立实验。</footer>
 </body>
 </html>
