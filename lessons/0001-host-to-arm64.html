@@ -23,7 +23,7 @@
       <h1>从 AMD64 构建并运行 ARM Linux 程序</h1>
       <p class="lede">先把“在哪里编译”和“程序要在哪里运行”分开。今天的成果是一支能在主机与 PYNQ-Z2 分别报告自身目标架构的 Rust 程序。</p>
       <div class="meta-row"><span><strong>时长</strong> 约 2–3 小时</span><span><strong>主题</strong> Cargo、目标平台、交叉编译</span><span><strong>完成标准</strong> 程序在板上报告 armv7l/linux</span></div>
-      <div class="outcome"><p><strong>本课成果</strong>：根据第 0 课确认的架构，在 Debian 13 AMD64 主机创建 Rust 项目、构建 ARMv7 hard-float Linux 可执行文件，并部署到 PYNQ-Z2 上运行。</p></div>
+      <div class="outcome"><p><strong>本课成果</strong>：根据第 0 课确认的官方镜像架构，在 Debian 13 AMD64 主机创建 Rust 项目、构建 ARMv7 hard-float Linux 可执行文件，并部署到 PYNQ-Z2 上运行。</p></div>
     </div>
   </header>
   <main>
@@ -32,13 +32,13 @@
       <p>不查资料，先用自己的话回答：主机（host）和目标（target）分别是哪台机器？第 0 课记录的 PYNQ-Z2 架构是什么？在主机上运行的程序，能直接在板子上运行吗？</p>
       <details>
         <summary>完成预测后查看自检要点</summary>
-        <div class="answer"><p>主机是 AMD64 Debian 13 开发机；目标是第 0 课确认的 Debian 13 armhf PYNQ-Z2。默认构建面向主机，目标架构不同的二进制不能直接在板上运行，必须针对 ARMv7 hard-float 构建。</p></div>
+        <div class="answer"><p>主机是 AMD64 Debian 13 开发机；目标是第 0 课确认的官方 PYNQ Linux 系统。默认构建面向主机，目标架构不同的二进制不能直接在板上运行，必须根据板上实际架构选择 ARMv7 hard-float target。</p></div>
       </details>
     </section>
 
     <section class="section">
       <h2>一个程序，两个平台</h2>
-      <p>源代码相同，构建时指定不同目标，Rust 编译器就会生成对应平台的程序。AMD64 主机负责编辑和编译；PYNQ-Z2 负责运行 ARMv7 Linux 程序。</p>
+      <p>源代码相同，构建时指定不同目标，Rust 编译器就会生成对应平台的程序。AMD64 主机负责编辑和编译；PYNQ-Z2 的官方 Linux 系统负责运行 ARM 程序。</p>
       <ol class="flow" aria-label="交叉编译流程">
         <li><strong>AMD64 主机</strong><span>编辑 Rust 源码</span></li>
         <li><strong>Rust 目标标准库</strong><span>选择 armv7 Linux</span></li>
@@ -115,7 +115,7 @@ ssh USER@BOARD_IP '/tmp/target-probe'</code></pre>
             <li><code>linker ... not found</code>：检查 Debian 交叉编译器是否安装，以及 Cargo linker 名称是否拼对。</li>
             <li><code>Exec format error</code>：目标二进制架构不匹配，重新确认第 0 课的架构记录和 ARMv7 target。</li>
             <li><code>Permission denied</code>：检查远端文件执行权限和部署用户权限。</li>
-            <li>找不到文件但路径确实存在：可能是动态加载器/运行库不匹配；记录错误全文和板上 Debian 信息再排查。</li>
+            <li>找不到文件但路径确实存在：可能是动态加载器、C 运行库或架构不匹配；记录错误全文和板上系统信息再排查。</li>
           </ul>
         </div>
       </details>
