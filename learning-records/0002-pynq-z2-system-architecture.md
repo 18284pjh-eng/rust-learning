@@ -21,3 +21,24 @@
 ## 待确认
 
 在板上记录 `cat /etc/os-release`、`uname -m`、`dpkg --print-architecture`、`cat /proc/device-tree/model`、内核版本以及 `/dev/ttyPS*`、`/dev/spidev*` 是否存在。若架构或 C 库与预期不同，暂停默认 Rust target 并核对系统来源。
+
+## 第 1 课验证结果
+
+- 主机原生产物：ELF 64 位 x86-64，动态链接到 `/lib64/ld-linux-x86-64.so.2`。
+- 交叉产物：ELF 32 位 ARM EABI5，动态链接到 `/lib/ld-linux-armhf.so.3`。
+- 板上运行：`target_probe` 正常输出 Hello World。
+- 概念确认：`host` 是编译发生的平台，`target` 是程序准备运行的平台；两者架构不同就需要交叉编译。
+
+## Cargo 默认目标
+
+项目可以在 `.cargo/config.toml` 中固定默认目标，避免每次重复写 `--target`：
+
+```toml
+[build]
+target = "armv7-unknown-linux-gnueabihf"
+
+[target.armv7-unknown-linux-gnueabihf]
+linker = "arm-linux-gnueabihf-gcc"
+```
+
+这样 `cargo build --release` 默认生成板上程序；主机调试时用 `cargo run --target x86_64-unknown-linux-gnu` 临时覆盖目标。
