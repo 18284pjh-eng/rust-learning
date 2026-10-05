@@ -76,17 +76,20 @@ rustup target add armv7-unknown-linux-gnueabihf</code></pre>
           <p>Debian 包会提供 <code>arm-linux-gnueabihf-gcc</code>。本机已安装的 Rust 工具链和这个交叉编译器是两件不同的工具。参阅<a href="https://packages.debian.org/trixie/gcc-arm-linux-gnueabihf">Debian 包说明</a>。</p>
         </li>
         <li>
-          <strong>告诉 Cargo 使用目标链接器。</strong>在项目中新建 <code>.cargo/config.toml</code>，写入：
-          <pre><code>[target.armv7-unknown-linux-gnueabihf]
+          <strong>把目标和链接器写入 Cargo 配置。</strong>在项目中新建 <code>.cargo/config.toml</code>，写入：
+          <pre><code>[build]
+target = "armv7-unknown-linux-gnueabihf"
+
+[target.armv7-unknown-linux-gnueabihf]
 linker = "arm-linux-gnueabihf-gcc"</code></pre>
-          <p>Cargo 支持按 target 配置 linker。参阅<a href="https://doc.rust-lang.org/cargo/reference/config.html">Cargo 配置参考</a>。</p>
+          <p><code>[build].target</code> 会把 ARMv7 设为这个项目的默认构建目标；<code>linker</code> 告诉 Cargo 使用 Debian 提供的 ARM GNU 链接器。配置文件应放在项目或工作区根目录，并可以提交到版本库。参阅<a href="https://doc.rust-lang.org/cargo/reference/config.html">Cargo 配置参考</a>。</p>
         </li>
         <li>
-          <strong>构建并检查 ARMv7 产物。</strong>
-          <pre><code>cargo build --release --target armv7-unknown-linux-gnueabihf
+          <strong>用默认目标构建并检查 ARMv7 产物。</strong>配置完成后不再需要重复写 <code>--target</code>：
+          <pre><code>cargo build --release
 file target/armv7-unknown-linux-gnueabihf/release/target-probe
 readelf -h target/armv7-unknown-linux-gnueabihf/release/target-probe</code></pre>
-          <p>检查格式是 ELF 32 位、ARM EABI5 hard-float。Cargo 会把目标产物放到独立的 target 目录。</p>
+          <p>检查格式是 ELF 32 位、ARM EABI5 hard-float。Cargo 会把目标产物放到独立的 target 目录。若只想临时覆盖项目默认值，仍可以手写 <code>--target</code>。</p>
         </li>
         <li>
           <strong>部署到 PYNQ-Z2 运行。</strong>将占位符替换成你自己的 Linux 用户名和板卡地址。不要把密码发到课程对话中。
@@ -103,10 +106,11 @@ ssh USER@BOARD_IP '/tmp/target-probe'</code></pre>
     <section class="section">
       <h2>验收清单</h2>
       <ul class="checks">
-        <li>主机原生运行时，程序报告 <code>linux/x86_64</code>。</li>
-        <li><code>file</code> 或 <code>readelf</code> 确认交叉构建结果是 ARMv7 hard-float ELF。</li>
-        <li>同一个程序部署到 PYNQ-Z2 后，报告 <code>linux/arm</code> 或 <code>armv7l</code>。</li>
-        <li>能解释 Cargo 默认构建目标与 <code>--target</code> 的区别。</li>
+        <li>主机原生构建结果是 ELF 64 位 x86-64，程序报告 <code>linux/x86_64</code>。</li>
+        <li><code>file</code> 或 <code>readelf</code> 确认交叉构建结果是 ELF 32 位 ARM EABI5 hard-float。</li>
+        <li>同一个程序部署到 PYNQ-Z2 后，报告 <code>linux/arm</code> 或 <code>armv7l</code>，并能正常输出 Hello World。</li>
+        <li>能解释 host 是编译所在平台，target 是程序运行平台。</li>
+        <li>能用 <code>.cargo/config.toml</code> 设置默认 ARM 目标，并知道如何临时切回主机目标。</li>
       </ul>
       <details>
         <summary>常见失败现象与定位方向</summary>
@@ -114,6 +118,7 @@ ssh USER@BOARD_IP '/tmp/target-probe'</code></pre>
           <ul>
             <li><code>linker ... not found</code>：检查 Debian 交叉编译器是否安装，以及 Cargo linker 名称是否拼对。</li>
             <li><code>Exec format error</code>：目标二进制架构不匹配，重新确认第 0 课的架构记录和 ARMv7 target。</li>
+            <li>配置默认 ARM 目标后主机执行 <code>cargo run</code> 失败：这是预期现象；用 <code>cargo run --target x86_64-unknown-linux-gnu</code> 运行主机版本，或只用 <code>cargo build --release</code> 生成板上版本。</li>
             <li><code>Permission denied</code>：检查远端文件执行权限和部署用户权限。</li>
             <li>找不到文件但路径确实存在：可能是动态加载器、C 运行库或架构不匹配；记录错误全文和板上系统信息再排查。</li>
           </ul>
@@ -123,7 +128,10 @@ ssh USER@BOARD_IP '/tmp/target-probe'</code></pre>
 
     <section class="section">
       <h2>带回来的结果</h2>
-      <p>完成后，把主机和板上的架构输出、ARMv7 ELF 检查结果，以及你对 host/target 的一句话解释发给我。我会据此检查构建链路，并决定下一课从哪些 Rust 基础开始。遇到错误时贴错误全文即可；不要贴密码、令牌或私钥。</p>
+      <p>你已经完成本课的核心验收：主机结果是 ELF 64 位 x86-64，板上结果是 ELF 32 位 ARM EABI5，板上程序能正常输出 Hello World，并能解释 host 与 target 的区别。下一步可把默认目标写入 <code>.cargo/config.toml</code>，再用下面的命令复核无参数交叉构建：</p>
+      <pre><code>cargo build --release
+file target/armv7-unknown-linux-gnueabihf/release/target-probe</code></pre>
+      <p>遇到错误时贴错误全文即可；不要贴密码、令牌或私钥。</p>
       <p class="next-step">下一课：用 Rust 的表达式、类型和控制流处理一小段通信配置。</p>
       <p class="small">参考速查：<a href="../reference/arm64-cross-compile.html">AMD64 到 ARM Linux 交叉编译</a> · <a href="../index.html">课程总览</a></p>
     </section>
