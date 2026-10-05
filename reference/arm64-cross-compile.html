@@ -14,10 +14,17 @@
       <h2>最小步骤</h2>
       <pre><code>sudo apt install gcc-arm-linux-gnueabihf
 rustup target add armv7-unknown-linux-gnueabihf
-cargo build --release --target armv7-unknown-linux-gnueabihf</code></pre>
-      <p>如果 Cargo 找不到目标链接器，在项目的 <code>.cargo/config.toml</code> 中指定：</p>
-      <pre><code>[target.armv7-unknown-linux-gnueabihf]
+[build]
+target = "armv7-unknown-linux-gnueabihf"
+
+[target.armv7-unknown-linux-gnueabihf]
 linker = "arm-linux-gnueabihf-gcc"</code></pre>
+      <p>上面的 <code>[build].target</code> 让项目默认交叉编译，因此之后可以直接运行：</p>
+      <pre><code>cargo build --release
+file target/armv7-unknown-linux-gnueabihf/release/target-probe</code></pre>
+      <p>如果不想让当前命令使用项目默认目标，可以临时覆盖：</p>
+      <pre><code>cargo build --release --target x86_64-unknown-linux-gnu
+cargo run --target x86_64-unknown-linux-gnu</code></pre>
     </section>
     <section class="section">
       <h2>检查结果</h2>
@@ -29,7 +36,7 @@ readelf -h target/armv7-unknown-linux-gnueabihf/release/target-probe</code></pre
       <h2>记住</h2>
       <ul>
         <li><code>rustup target add</code> 安装 Rust 对应目标的标准库，不会安装 GNU 链接器。</li>
-        <li><code>--target</code> 设定程序的目标平台；本机直接 <code>cargo run</code> 仍运行 AMD64 版本。</li>
+        <li><code>--target</code> 设定或临时覆盖程序的目标平台；项目配置了默认 ARM 目标后，主机运行要显式选择 <code>x86_64-unknown-linux-gnu</code>。</li>
         <li>交叉编译成功证明产物格式正确；最终仍要在 PYNQ-Z2 上运行验收。</li>
       </ul>
       <p class="small">主要资料：<a href="https://rust-lang.github.io/rustup/cross-compilation.html">rustup 交叉编译指南</a>、<a href="https://doc.rust-lang.org/cargo/reference/config.html">Cargo 配置参考</a>。</p>
