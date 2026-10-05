@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第 2 课：Rust 表达式、类型与控制流</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+  <div class="topline">
+    <div class="topline-inner">
+      <strong>Rust · PYNQ-Z2</strong>
+      <nav aria-label="课程导航">
+        <a href="../index.html">课程总览</a>
+        <a href="0001-host-to-arm64.html">第 1 课</a>
+        <a href="../reference/rust-expressions-control-flow.html">语法速查</a>
+      </nav>
+    </div>
+  </div>
+  <header class="masthead">
+    <div class="topline-inner" style="display:block">
+      <p class="eyebrow">Lesson 02 · Rust foundations</p>
+      <h1>Rust 表达式、类型与控制流</h1>
+      <p class="lede">先不接真实串口，用一个 UART 配置选择器练习 Rust 的基本表达方式。你会把配置值交给函数、让条件产生结果，并在主机和 PYNQ-Z2 的目标构建之间保持同一份源码。</p>
+      <div class="meta-row"><span><strong>时长</strong> 约 2–3 小时</span><span><strong>主题</strong> 类型、表达式、函数、if、for</span><span><strong>完成标准</strong> 配置选择器可构建并输出</span></div>
+      <div class="outcome"><p><strong>本课成果</strong>：完成一个无第三方依赖的 UART 配置选择器，能判断波特率档位和帧格式，并用项目中的 Cargo 默认目标生成 ARMv7 可执行文件。</p></div>
+    </div>
+  </header>
+  <main>
+    <section class="section">
+      <h2>开始前，先回忆</h2>
+      <p>先不查资料，用一句话回答：为什么下面两个程序不能互换运行？主机程序是 ELF 64 位 x86-64，板上程序是 ELF 32 位 ARM。</p>
+      <details>
+        <summary>完成回忆后查看要点</summary>
+        <div class="answer"><p>源代码可以相同，但编译目标不同；host 是编译发生的平台，target 是程序准备运行的平台。本课开始关注源代码本身：变量的类型、表达式的值和控制流。</p></div>
+      </details>
+    </section>
+
+    <section class="section">
+      <h2>四个 Rust 规则</h2>
+      <ol class="checks">
+        <li><strong>绑定默认不可变。</strong><br><code>let baud = 115_200u32;</code> 之后不能给 <code>baud</code> 重新赋值；需要改变绑定时明确写 <code>let mut</code>。</li>
+        <li><strong>类型在编译期确定。</strong><br><code>u32</code>、<code>u8</code>、<code>bool</code> 和 <code>&amp;str</code> 不是可以自动互换的“通用值”。</li>
+        <li><strong>表达式会产生值。</strong><br><code>if</code> 的两个分支都可以产生一个值；两个分支必须是同一种类型。</li>
+        <li><strong>函数签名说明边界。</strong><br><code>fn classify_baud(baud: u32) -&gt; &amp;'static str</code> 明确输入和输出类型，编译器会检查调用方。</li>
+      </ol>
+      <p>这些规则先服务于配置逻辑。所有权、借用和 <code>Result</code> 会在后续专门课程中展开，不需要在本课提前背完。</p>
+      <p>主阅读材料：Rust 官方《The Rust Programming Language》的<a href="https://doc.rust-lang.org/book/ch03-00-common-programming-concepts.html">常见编程概念</a>和<a href="https://doc.rust-lang.org/book/ch03-05-control-flow.html">控制流</a>章节。</p>
+    </section>
+
+    <section class="section">
+      <h2>任务 A：写出 UART 配置选择器</h2>
+      <p>在课程工作区的练习目录中创建项目：</p>
+      <pre><code>cargo new case/uart-config
+cd case/uart-config</code></pre>
+      <p>编辑 <code>src/main.rs</code>，实现下面的行为。先自己写，再对照要求运行；不要直接复制一个完整答案。</p>
+      <ul class="checks">
+        <li>定义 <code>baud: u32 = 115_200</code>、<code>data_bits: u8 = 8</code>、<code>stop_bits: u8 = 1</code> 和 <code>parity = "N"</code>。</li>
+        <li>写函数 <code>classify_baud(baud: u32) -&gt; &amp;'static str</code>：不超过 9,600 返回 <code>slow</code>；不超过 115,200 返回 <code>normal</code>；其他值返回 <code>fast</code>。</li>
+        <li>用一个 <code>if</code> 表达式得到帧格式：当 <code>data_bits == 8</code>、<code>parity == "N"</code>、<code>stop_bits == 1</code> 时返回 <code>8N1</code>，否则返回 <code>custom</code>。</li>
+        <li>打印波特率、帧格式和波特率档位。推荐输出形状如下：</li>
+      </ul>
+      <pre><code>baud=115200
+frame=8N1
+class=normal</code></pre>
+      <p>注意：<code>if</code> 的每个分支都必须返回同一类型；这里都返回字符串切片 <code>&amp;str</code>。这正是 Rust 在编译期帮你检查配置逻辑的地方。</p>
+    </section>
+
+    <section class="section">
+      <h2>任务 B：用输入改变结果</h2>
+      <p>不要先增加命令行解析。直接修改三个配置值，每次修改前先预测输出，再运行程序验证：</p>
+      <ol class="steps">
+        <li>把 <code>baud</code> 改为 <code>9_600</code>，预期档位变为 <code>slow</code>。</li>
+        <li>把 <code>baud</code> 改为 <code>1_000_000</code>，预期档位变为 <code>fast</code>。</li>
+        <li>把 <code>data_bits</code> 改为 <code>7</code>，预期帧格式变为 <code>custom</code>。</li>
+        <li>把 <code>let baud</code> 改成先绑定再赋值，观察编译器如何要求 <code>mut</code>；然后恢复成最简单的不可变绑定。</li>
+      </ol>
+      <pre><code>cargo fmt
+cargo run
+cargo check</code></pre>
+      <p>本任务的重点是“先预测，再编译”，而不是堆更多功能。把编译器报错完整读一遍，记录错误代码和它指出的变量。</p>
+    </section>
+
+    <section class="section">
+      <h2>任务 C：把控制流放进数据检查</h2>
+      <p>新增函数 <code>is_supported_baud(baud: u32) -&gt; bool</code>，只接受 <code>9_600</code>、<code>19_200</code>、<code>57_600</code> 和 <code>115_200</code>。在 <code>main</code> 中用 <code>for</code> 遍历这四个候选值，逐个打印是否支持。</p>
+      <pre><code>for baud in [9_600, 19_200, 57_600, 115_200] {
+    println!("{baud}: {}", is_supported_baud(baud));
+}</code></pre>
+      <p>再加入一个不支持的值，例如 <code>1_000_000</code>，确认函数返回 <code>false</code>。这段逻辑以后可以变成串口配置的输入校验；本课暂时只返回布尔值，错误类型留到第 5 课。</p>
+    </section>
+
+    <section class="section">
+      <h2>任务 D：在两个目标上构建</h2>
+      <p>如果本项目也使用第 1 课的 <code>.cargo/config.toml</code>，项目默认目标就是 ARMv7：</p>
+      <pre><code>cargo build --release
+file target/armv7-unknown-linux-gnueabihf/release/uart-config</code></pre>
+      <p>需要在主机上运行调试时，临时覆盖为 x86_64：</p>
+      <pre><code>cargo run --target x86_64-unknown-linux-gnu</code></pre>
+      <p>本课不要求把程序部署到板上；交叉构建成功即可。若你愿意，也可以把 ARM 产物复制到 PYNQ-Z2，运行后应看到同样的配置输出。</p>
+    </section>
+
+    <section class="section">
+      <h2>验收清单</h2>
+      <ul class="checks">
+        <li>能解释 <code>let</code>、<code>let mut</code> 和重新绑定的区别。</li>
+        <li>能说出 <code>if</code> 作为表达式时，两个分支为什么需要同一类型。</li>
+        <li><code>classify_baud</code> 和 <code>is_supported_baud</code> 能通过 <code>cargo check</code>。</li>
+        <li>主机运行输出能随配置值变化，且 ARMv7 release 构建成功。</li>
+        <li>能指出本课还没有处理无效输入的详细错误原因，并知道这会在 <code>Result</code> 课程中处理。</li>
+      </ul>
+      <details>
+        <summary>常见错误与定位方向</summary>
+        <div class="answer">
+          <ul>
+            <li><code>cannot assign twice to immutable variable</code>：你给不可变绑定重新赋值了；优先考虑重新绑定或明确加入 <code>mut</code>。</li>
+            <li><code>if and else have incompatible types</code>：两个分支返回类型不一致，例如一个是数字、一个是字符串。</li>
+            <li><code>mismatched types</code>：检查 <code>u8</code>、<code>u32</code> 和字符串切片是否混用，必要时在绑定处写出类型。</li>
+            <li>主机直接执行 ARM 程序出现 <code>Exec format error</code>：用 <code>cargo run --target x86_64-unknown-linux-gnu</code> 运行主机版本。</li>
+          </ul>
+        </div>
+      </details>
+    </section>
+
+    <section class="section">
+      <h2>带回来的结果</h2>
+      <p>把下面内容带回课程对话：<code>src/main.rs</code>、主机运行输出、<code>cargo check</code> 结果、ARMv7 的 <code>file</code> 输出，以及一个你主动制造并修复的编译器错误。不要贴密码、令牌或私钥。</p>
+      <p class="next-step">下一课：用结构体和枚举描述通信配置与数据帧。</p>
+      <p class="small">参考速查：<a href="../reference/rust-expressions-control-flow.html">Rust 表达式与控制流</a> · <a href="../lessons/0001-host-to-arm64.html">第 1 课</a> · <a href="../index.html">课程总览</a></p>
+    </section>
+  </main>
+  <footer>完成任务后带回代码和输出。任何不理解的编译器提示，都可以连同上下文继续提问。</footer>
+</body>
+</html>
