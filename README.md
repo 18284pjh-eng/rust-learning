@@ -15,7 +15,8 @@
 1. 打开 [`index.html`](index.html) 查看课程路径。
 2. 先学习 [第 0 课：从 TF 卡启动官方 PYNQ-Z2 镜像](lessons/0000-pynq-z2-debian13.html)。
 3. 再学习 [第 1 课：从 AMD64 构建并运行 ARM Linux 程序](lessons/0001-host-to-arm64.html)。
-4. 查阅[官方镜像系统搭建速查](reference/pynq-z2-debian13.html)、[交叉编译速查](reference/arm64-cross-compile.html)和[学习资源](RESOURCES.md)。
+4. 开始[第 2 课：Rust 表达式、类型与控制流](lessons/0002-rust-expressions-types-control-flow.html)。
+5. 查阅[官方镜像系统搭建速查](reference/pynq-z2-debian13.html)、[交叉编译速查](reference/arm64-cross-compile.html)、[Rust 语法速查](reference/rust-expressions-control-flow.html)和[学习资源](RESOURCES.md)。
 
 课程目标与范围见 [MISSION.md](MISSION.md)，术语约定见 [CONTEXT.md](CONTEXT.md)。
 

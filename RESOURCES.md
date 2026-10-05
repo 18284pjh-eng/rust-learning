@@ -19,6 +19,12 @@
 
 - [The Rust Programming Language](https://doc.rust-lang.org/book/)
   Official Rust book. Use for the language foundations, especially ownership, borrowing, structs/enums, and error handling.
+- [Common Programming Concepts](https://doc.rust-lang.org/book/ch03-00-common-programming-concepts.html)
+  The primary reading for Lesson 2: variables, types, functions, and the basic expression model.
+- [Control Flow](https://doc.rust-lang.org/book/ch03-05-control-flow.html)
+  The primary reading for Lesson 2's `if` expressions and loops.
+- [`std::env::args`](https://doc.rust-lang.org/std/env/fn.args.html)
+  Standard-library reference for the optional command-line extension in later configuration exercises.
 - [Rust by Example](https://doc.rust-lang.org/rust-by-example/)
   Official runnable examples. Use as a concise companion when looking up syntax introduced in a lesson.
 - [Cross-compilation - The rustup book](https://rust-lang.github.io/rustup/cross-compilation.html)
