@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>速查：Rust 表达式、类型与控制流</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+  <div class="topline"><div class="topline-inner"><strong>Rust 参考页</strong><nav><a href="../index.html">课程总览</a><a href="../lessons/0002-rust-expressions-types-control-flow.html">第 2 课</a></nav></div></div>
+  <header class="masthead"><div class="topline-inner" style="display:block"><p class="eyebrow">Reference · Rust foundations</p><h1>表达式、类型与控制流</h1><p class="lede">用最少的语法构造可检查的配置逻辑，为所有权、错误处理和 Linux I/O 做准备。</p></div></header>
+  <main>
+    <section class="section">
+      <h2>绑定与类型</h2>
+      <pre><code>let baud: u32 = 115_200;
+let data_bits: u8 = 8;
+let mut attempts = 0;
+attempts += 1;
+
+let label = "8N1";       // &amp;str
+let ready = true;        // bool</code></pre>
+      <ul class="checks">
+        <li><code>let</code> 默认不可变；只有需要修改绑定时才用 <code>let mut</code>。</li>
+        <li>类型在编译期确定；数字类型和字符串切片不会自动互换。</li>
+        <li>同一作用域可以重新绑定同名变量，这叫 shadowing；它和修改原绑定不同。</li>
+      </ul>
+    </section>
+    <section class="section">
+      <h2>表达式与函数</h2>
+      <pre><code>fn classify_baud(baud: u32) -&gt; &amp;'static str {
+    if baud &lt;= 9_600 {
+        "slow"
+    } else if baud &lt;= 115_200 {
+        "normal"
+    } else {
+        "fast"
+    }
+}</code></pre>
+      <p>函数签名写清输入和输出。代码块最后一个表达式可以成为返回值；如果写分号，它就变成语句。</p>
+    </section>
+    <section class="section">
+      <h2>条件与循环</h2>
+      <pre><code>let frame = if data_bits == 8 &amp;&amp; parity == "N" &amp;&amp; stop_bits == 1 {
+    "8N1"
+} else {
+    "custom"
+};
+
+for baud in [9_600, 19_200, 115_200] {
+    println!("{baud}: {}", classify_baud(baud));
+}</code></pre>
+      <p><code>if</code> 每个分支必须产生兼容类型。<code>for</code> 适合遍历固定的候选配置；后续处理设备输入时，再把错误显式建模为 <code>Result</code>。</p>
+    </section>
+    <section class="section">
+      <h2>构建命令</h2>
+      <pre><code>cargo fmt
+cargo check
+cargo build --release
+cargo run --target x86_64-unknown-linux-gnu</code></pre>
+      <p>项目的 <code>.cargo/config.toml</code> 可以把 ARMv7 设为默认目标；最后一条命令临时覆盖它，让程序在 AMD64 主机上运行。</p>
+    </section>
+  </main>
+  <footer><a href="../index.html">回到课程总览</a></footer>
+</body>
+</html>
