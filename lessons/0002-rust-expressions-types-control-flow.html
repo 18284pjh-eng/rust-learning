@@ -86,7 +86,7 @@ class=normal</code></pre>
         <li>把 <code>baud</code> 改为 <code>9_600</code>，预期档位变为 <code>slow</code>。</li>
         <li>把 <code>baud</code> 改为 <code>1_000_000</code>，预期档位变为 <code>fast</code>。</li>
         <li>把 <code>data_bits</code> 改为 <code>7</code>，预期帧格式变为 <code>custom</code>。</li>
-        <li>把 <code>let baud</code> 改成先绑定再赋值，观察编译器如何要求 <code>mut</code>；然后恢复成最简单的不可变绑定。</li>
+        <li>先试 <code>let baud: u32; baud = 115_200;</code>，观察“声明后首次初始化”不需要 <code>mut</code>；再改成 <code>let baud: u32 = 0; baud = 115_200;</code>，观察对已初始化绑定重新赋值时的错误，最后改为 <code>let mut baud: u32 = 0; baud = 115_200;</code>，并恢复成最简单的 <code>let baud: u32 = 115_200;</code>。</li>
       </ol>
       <pre><code>cargo fmt
 cargo run
