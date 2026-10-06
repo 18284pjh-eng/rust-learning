@@ -49,6 +49,19 @@
     </section>
 
     <section class="section">
+      <h2>先分清 frame 和 class</h2>
+      <p><code>8N1</code> 是 UART 帧格式：<strong>8</strong> 个数据位，<strong>N</strong> 表示 No parity（不发送校验位），<strong>1</strong> 个停止位。它不是“校验位固定为 0”。如果硬件使用固定 0 或固定 1 的 stick parity，通常会单独称为 space parity 或 mark parity；本课不使用它。</p>
+      <p>一帧通常还包含 1 个起始位：线路空闲时为高，起始位拉低，然后发送数据位（常见 UART 为低位先发），最后发送停止位（高电平）。所以常见的 <code>8N1</code> 每个字节在线路上占 10 个 bit time：1 起始位 + 8 数据位 + 1 停止位。</p>
+      <p>本课的 <code>class</code> 只是为了练习条件表达式而起的应用层分类，不是 UART 标准配置，也不会改变串口硬件：</p>
+      <ul class="checks">
+        <li><code>slow</code>：波特率不超过 9,600。</li>
+        <li><code>normal</code>：波特率大于 9,600 且不超过 115,200；例如 19,200、57,600、115,200。</li>
+        <li><code>fast</code>：波特率大于 115,200；例如 1,000,000。</li>
+      </ul>
+      <p>因此你常用的 <code>normal</code> 只是这段练习代码中的标签。真正配置 UART 时，仍要分别设置波特率、数据位、校验方式和停止位；PYNQ-Z2 串口控制台常见的配置是 <code>115200 8N1</code>。</p>
+    </section>
+
+    <section class="section">
       <h2>任务 A：写出 UART 配置选择器</h2>
       <p>在课程工作区的练习目录中创建项目：</p>
       <pre><code>cargo new case/uart-config

@@ -26,6 +26,15 @@ let ready = true;        // bool</code></pre>
       </ul>
     </section>
     <section class="section">
+      <h2>UART 记法</h2>
+      <ul class="checks">
+        <li><code>8N1</code> = 8 个数据位、无校验位、1 个停止位。</li>
+        <li><code>N</code> 是 no parity，不是“校验位发送 0”；固定 0/1 属于 stick parity 的 space/mark 形式。</li>
+        <li><code>classify_baud</code> 的 <code>slow</code>/<code>normal</code>/<code>fast</code> 只是本课的波特率标签，不是 UART 的硬件模式。</li>
+        <li>本课阈值：<code>&lt;= 9600</code> 为 <code>slow</code>，<code>&lt;= 115200</code> 为 <code>normal</code>，其余为 <code>fast</code>。</li>
+      </ul>
+    </section>
+    <section class="section">
       <h2>表达式与函数</h2>
       <pre><code>fn classify_baud(baud: u32) -&gt; &amp;'static str {
     if baud &lt;= 9_600 {

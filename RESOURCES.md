@@ -23,6 +23,8 @@
   The primary reading for Lesson 2: variables, types, functions, and the basic expression model.
 - [Control Flow](https://doc.rust-lang.org/book/ch03-05-control-flow.html)
   The primary reading for Lesson 2's `if` expressions and loops.
+- [Linux `termios` reference](https://www.man7.org/linux/man-pages/man3/termios.3.html)
+  Defines character size, stop-bit, parity-enable, and odd/even parity controls used by Linux serial user-space programs.
 - [`std::env::args`](https://doc.rust-lang.org/std/env/fn.args.html)
   Standard-library reference for the optional command-line extension in later configuration exercises.
 - [Rust by Example](https://doc.rust-lang.org/rust-by-example/)
