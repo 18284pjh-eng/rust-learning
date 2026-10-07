@@ -23,6 +23,12 @@
   The primary reading for Lesson 2: variables, types, functions, and the basic expression model.
 - [Control Flow](https://doc.rust-lang.org/book/ch03-05-control-flow.html)
   The primary reading for Lesson 2's `if` expressions and loops.
+- [Using Structs to Structure Related Data](https://doc.rust-lang.org/book/ch05-00-structs.html)
+  The primary reading for Lesson 3's named UART configuration fields.
+- [Enums and Pattern Matching](https://doc.rust-lang.org/book/ch06-00-enums.html)
+  The primary reading for Lesson 3's parity and frame-state enums.
+- [The `match` Control Flow Construct](https://doc.rust-lang.org/book/ch06-02-match.html)
+  Explains exhaustive matching and binding fields from data-frame variants.
 - [Linux `termios` reference](https://www.man7.org/linux/man-pages/man3/termios.3.html)
   Defines character size, stop-bit, parity-enable, and odd/even parity controls used by Linux serial user-space programs.
 - [`std::env::args`](https://doc.rust-lang.org/std/env/fn.args.html)

@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第 3 课：结构体、枚举与数据帧</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+  <div class="topline">
+    <div class="topline-inner">
+      <strong>Rust · PYNQ-Z2</strong>
+      <nav aria-label="课程导航">
+        <a href="../index.html">课程总览</a>
+        <a href="0002-rust-expressions-types-control-flow.html">第 2 课</a>
+        <a href="../reference/rust-structs-enums-frames.html">语法速查</a>
+      </nav>
+    </div>
+  </div>
+  <header class="masthead">
+    <div class="topline-inner" style="display:block">
+      <p class="eyebrow">Lesson 03 · Rust data modeling</p>
+      <h1>结构体、枚举与数据帧</h1>
+      <p class="lede">把分散的 UART 配置整理成有名字的类型，再用枚举描述帧的不同状态。你会开始让编译器检查“哪些状态可能出现”，为后续所有权、借用和错误处理打基础。</p>
+      <div class="meta-row"><span><strong>时长</strong> 约 2–3 小时</span><span><strong>主题</strong> struct、enum、match、借用读取</span><span><strong>完成标准</strong> 配置与帧模型可构建并通过 ARM 检查</span></div>
+      <div class="outcome"><p><strong>本课成果</strong>：完成一个固定长度数据帧模型，能打印 UART 配置、匹配 <code>8N1</code>/<code>8E1</code>/<code>8O1</code>，并对数据帧和错误帧分别处理。</p></div>
+    </div>
+  </header>
+  <main>
+    <section class="section">
+      <h2>开始前，先回忆</h2>
+      <p>不查资料，先回答两个问题：第 2 课为什么用 <code>[...].contains(&amp;baud)</code>，而不是把四个数字写成一个元组？如果帧格式不是 <code>8N1</code>，上一课的 <code>custom</code> 代表什么？</p>
+      <details>
+        <summary>完成回忆后查看要点</summary>
+        <div class="answer"><p>数组表示一组可以逐个检查的候选值，元组是一个固定结构的整体；<code>custom</code> 只是练习代码中对“不是 8N1”的标签，并没有描述具体是哪一种帧。本课把这些分散的值放进有名字的类型。</p></div>
+      </details>
+    </section>
+
+    <section class="section">
+      <h2>先选择合适的类型</h2>
+      <ul class="checks">
+        <li><strong>结构体 struct</strong>：多个字段总是一起描述一个对象，例如波特率、数据位和停止位共同组成 UART 配置。</li>
+        <li><strong>枚举 enum</strong>：一个值只能是若干变体中的一个，例如无校验、偶校验或奇校验。</li>
+        <li><strong>match</strong>：根据枚举的变体执行不同分支；编译器会检查所有可能的变体是否处理完整。</li>
+      </ul>
+      <p>这比用多个字符串和布尔值更可靠：<code>Parity::Even</code> 是受类型约束的状态，不能误写成任意字符串。Rust 官方把结构体视为组合相关数据的自定义类型，把枚举视为列出可能变体的自定义类型。</p>
+      <p>主阅读材料：Rust 官方《The Rust Programming Language》的<a href="https://doc.rust-lang.org/book/ch05-00-structs.html">结构体章节</a>、<a href="https://doc.rust-lang.org/book/ch06-00-enums.html">枚举章节</a>和<a href="https://doc.rust-lang.org/book/ch06-02-match.html"><code>match</code>章节</a>。</p>
+    </section>
+
+    <section class="section">
+      <h2>任务 A：把 UART 配置建模成类型</h2>
+      <p>继续使用 <code>case/uart_config</code>。先定义校验方式和配置结构体：</p>
+      <pre><code>#[derive(Debug, Clone, Copy)]
+enum Parity {
+    None,
+    Even,
+    Odd,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct UartConfig {
+    baud: u32,
+    data_bits: u8,
+    stop_bits: u8,
+    parity: Parity,
+}</code></pre>
+      <p><code>Parity::None</code> 这样的写法明确指出了枚举变体。<code>derive</code> 让编译器自动生成调试打印和小型值的复制能力；本课先把它当作工具使用，所有权细节在下一课展开。</p>
+      <ol class="steps">
+        <li>删除 <code>main</code> 中分散的 <code>data_bits</code>、<code>stop_bits</code> 和 <code>parity</code> 绑定。</li>
+        <li>创建一个 <code>UartConfig</code> 实例，使用 <code>baud: 115_200</code>、<code>data_bits: 8</code>、<code>stop_bits: 1</code> 和 <code>parity: Parity::None</code>。</li>
+        <li>用 <code>println!("{config:?}")</code> 观察结构体的调试输出。</li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <h2>任务 B：用 match 生成帧标签</h2>
+      <p>把第 2 课的条件判断改造成函数。注意这里传入的是配置的借用，暂时不会取得配置的所有权：</p>
+      <pre><code>fn frame_label(config: &amp;UartConfig) -&gt; &amp;'static str {
+    match (config.data_bits, config.parity, config.stop_bits) {
+        (8, Parity::None, 1) =&gt; "8N1",
+        (8, Parity::Even, 1) =&gt; "8E1",
+        (8, Parity::Odd, 1) =&gt; "8O1",
+        _ =&gt; "custom",
+    }
+}</code></pre>
+      <p>这里的 <code>match</code> 匹配一个三元组：数据位、校验方式、停止位。下划线分支覆盖其他组合，因此函数始终有返回值。</p>
+      <ol class="steps">
+        <li>在 <code>main</code> 中打印 <code>frame_label(&amp;config)</code>，确认默认配置得到 <code>8N1</code>。</li>
+        <li>把校验方式改成 <code>Parity::Even</code>，预测并确认得到 <code>8E1</code>。</li>
+        <li>把数据位改成 <code>7</code>，确认得到 <code>custom</code>。</li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <h2>任务 C：让 enum 描述数据帧状态</h2>
+      <p>固定长度的四字节载荷足够练习类型建模，也不会提前引入堆和 <code>Vec</code>：</p>
+      <pre><code>#[derive(Debug)]
+enum Frame {
+    Data { sequence: u16, payload: [u8; 4] },
+    Error { code: u8 },
+}
+
+fn frame_summary(frame: &amp;Frame) -&gt; (&amp;'static str, usize) {
+    match frame {
+        Frame::Data { payload, .. } =&gt; ("data", payload.len()),
+        Frame::Error { .. } =&gt; ("error", 0),
+    }
+}</code></pre>
+      <p><code>Frame::Data</code> 和 <code>Frame::Error</code> 是同一个类型的两种状态。<code>..</code> 表示这个分支不关心其他字段；<code>&amp;Frame</code> 表示只读取帧，不把它移动进函数。</p>
+      <ol class="steps">
+        <li>创建一个 <code>Frame::Data</code>，序号为 <code>1</code>，载荷为 <code>[0x55, 0xAA, 0x01, 0x00]</code>。</li>
+        <li>创建一个 <code>Frame::Error { code: 2 }</code>。</li>
+        <li>分别调用 <code>frame_summary(&amp;data_frame)</code> 和 <code>frame_summary(&amp;error_frame)</code>，打印返回的类别和长度。</li>
+        <li>临时删除 <code>Frame::Error</code> 分支并运行 <code>cargo check</code>，阅读编译器的 non-exhaustive patterns 错误，然后恢复它。</li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <h2>任务 D：整合并在两个目标上检查</h2>
+      <p>把配置、标签函数、帧枚举和摘要函数放进同一个 <code>src/main.rs</code>。主程序至少输出：</p>
+      <pre><code>config=UartConfig { ... }
+frame=8N1
+data: 4 bytes
+error: 0 bytes</code></pre>
+      <p>输出中的结构体字段具体排版由调试格式决定，不必逐字符相同；关键是配置、帧标签和两种帧状态都出现。</p>
+      <pre><code>cargo fmt
+cargo check
+cargo run --target x86_64-unknown-linux-gnu
+cargo build --release
+file target/armv7-unknown-linux-gnueabihf/release/uart_config</code></pre>
+      <p>本课不要求把帧发送到真实 UART。先让同一份类型模型在 AMD64 主机和 PYNQ-Z2 的 ARMv7 目标上通过编译。</p>
+    </section>
+
+    <section class="section">
+      <h2>验收清单</h2>
+      <ul class="checks">
+        <li>能说明结构体字段为什么比元组位置更适合描述 UART 配置。</li>
+        <li>能区分 <code>Parity::None</code> 这样的枚举变体和任意字符串。</li>
+        <li>能使用 <code>match</code> 同时匹配值和枚举变体，并处理通配分支。</li>
+        <li>能解释 <code>&amp;UartConfig</code> 和 <code>&amp;Frame</code> 表示只借用读取，而不是取得所有权。</li>
+        <li>删除一个 <code>match</code> 分支后，能读懂编译器关于未覆盖状态的提示并恢复完整匹配。</li>
+        <li>主机运行、<code>cargo check</code> 和 ARMv7 release 构建都成功。</li>
+      </ul>
+      <details>
+        <summary>常见错误与定位方向</summary>
+        <div class="answer">
+          <ul>
+            <li><code>use of undeclared type</code>：检查类型名和枚举变体是否使用大写开头，并确认定义在调用前。</li>
+            <li><code>non-exhaustive patterns</code>：<code>match</code> 漏掉了枚举变体或没有使用覆盖其他情况的 <code>_</code>。</li>
+            <li><code>cannot move out of</code>：函数参数可能拿到了值的所有权；本课读取结构体时使用 <code>&amp;UartConfig</code> 或 <code>&amp;Frame</code>。</li>
+            <li><code>doesn't implement Debug</code>：打印 <code>{:?}</code> 的类型需要添加 <code>#[derive(Debug)]</code>。</li>
+          </ul>
+        </div>
+      </details>
+    </section>
+
+    <section class="section">
+      <h2>带回来的结果</h2>
+      <p>把下面内容带回课程对话：更新后的 <code>src/main.rs</code>、主机输出、<code>cargo check</code> 结果、ARMv7 的 <code>file</code> 输出，以及一次你主动删除 <code>match</code> 分支后修复的编译器错误。不要贴密码、令牌或私钥。</p>
+      <p class="next-step">下一课：所有权、借用与固定缓冲区，解释帧数据如何安全地在函数之间传递。</p>
+      <p class="small">参考速查：<a href="../reference/rust-structs-enums-frames.html">结构体、枚举与数据帧</a> · <a href="0002-rust-expressions-types-control-flow.html">第 2 课</a> · <a href="../index.html">课程总览</a></p>
+    </section>
+  </main>
+  <footer>课程以可运行的小任务推进。遇到不理解的类型或编译器提示，带上代码和完整错误信息继续提问。</footer>
+</body>
+</html>
